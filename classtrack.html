@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ClassTrack — XI-B</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#000;--s1:#0f0f14;--s2:#16161d;--s3:#1e1e27;
+  --glass:rgba(255,255,255,0.04);--glass2:rgba(255,255,255,0.07);--glass3:rgba(255,255,255,0.11);
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#f2f2f7;--sub:rgba(255,255,255,0.5);--muted:rgba(255,255,255,0.28);
+  --accent:#6e6af0;--accent-bg:rgba(110,106,240,0.12);--accent-glow:rgba(110,106,240,0.25);
+  --green:#30d158;--green-bg:rgba(48,209,88,0.1);--green-glow:rgba(48,209,88,0.2);
+  --amber:#ff9f0a;--amber-bg:rgba(255,159,10,0.1);
+  --red:#ff453a;--red-bg:rgba(255,69,58,0.1);--red-border:rgba(255,69,58,0.3);
+  --purple:#bf5af2;--blue:#0a84ff;
+  --sunday:rgba(255,69,58,0.08);--sunday-text:#ff6b60;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --ease:cubic-bezier(0.25,0.46,0.45,0.94);--spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:var(--font);color:var(--text);font-size:14px;}
+button{font-family:var(--font);cursor:pointer;}
+
+/* SCREENS */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;transition:opacity .35s var(--ease),transform .35s var(--ease);will-change:transform,opacity;}
+.screen.out{opacity:0;transform:translateY(-18px) scale(0.97);pointer-events:none;}
+.screen.hidden-below{opacity:0;transform:translateY(36px) scale(0.97);pointer-events:none;}
+
+/* BG */
+.bg-blob{position:fixed;inset:0;pointer-events:none;z-index:0;
+background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(110,106,240,0.12) 0%,transparent 60%),
+radial-gradient(ellipse 50% 40% at 85% 85%,rgba(48,209,88,0.05) 0%,transparent 50%),var(--bg);}
+
+/* HOME */
+#homeScreen{background:transparent;z-index:1;}
+.home-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding-bottom:40px;}
+.home-scroll::-webkit-scrollbar{display:none;}
+.home-hero{padding:60px 22px 28px;}
+.home-chip{display:inline-flex;align-items:center;gap:6px;background:var(--glass2);border:1px solid var(--border2);border-radius:20px;padding:5px 13px;font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:18px;backdrop-filter:blur(10px);}
+.live-pulse{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.home-title{font-size:40px;font-weight:700;letter-spacing:-.035em;line-height:1.05;margin-bottom:10px;background:linear-gradient(150deg,#fff 40%,rgba(255,255,255,.6));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.home-title .acc{background:linear-gradient(135deg,#6e6af0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.home-sub{font-size:14px;color:var(--sub);line-height:1.6;max-width:290px;}
+.status-row{display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;color:var(--muted);}
+.edit-bar{padding:0 14px 14px;}
+.edit-toggle{width:100%;padding:14px 18px;border-radius:16px;background:var(--glass);border:1px solid var(--border);color:var(--sub);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;backdrop-filter:blur(20px);transition:all .3s var(--ease);}
+.edit-toggle:active{transform:scale(.98);}
+.edit-toggle.on{background:rgba(110,106,240,.12);border-color:rgba(110,106,240,.4);color:#a78bfa;box-shadow:0 0 20px rgba(110,106,240,.12);}
+.lock-icon{font-size:16px;transition:transform .4s var(--spring);}
+.edit-toggle.on .lock-icon{transform:rotate(-20deg);}
+.nav-cards{padding:0 14px;display:flex;flex-direction:column;gap:10px;}
+.nav-card{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;backdrop-filter:blur(20px);transition:all .25s var(--ease);overflow:hidden;position:relative;}
+.nav-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--nc,rgba(255,255,255,.04)) 0%,transparent 60%);opacity:0;transition:opacity .2s;}
+.nav-card:active{transform:scale(.97);}
+.nav-card:active::before{opacity:1;}
+.card-icon{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.card-content{flex:1;}
+.card-name{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-bottom:3px;}
+.card-desc{font-size:12px;color:var(--sub);line-height:1.4;}
+.card-prog{margin-top:8px;height:2px;background:var(--border);border-radius:1px;overflow:hidden;}
+.card-prog-fill{height:100%;border-radius:1px;transition:width .6s var(--ease);}
+.card-arrow{color:var(--muted);font-size:18px;flex-shrink:0;}
+
+/* INNER HEADER */
+.inner-hdr{display:flex;align-items:center;gap:12px;padding:54px 14px 12px;flex-shrink:0;background:rgba(0,0,0,.5);backdrop-filter:blur(30px);border-bottom:1px solid var(--border);z-index:2;}
+.back-btn{width:34px;height:34px;border-radius:50%;background:var(--glass2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--accent);font-size:18px;flex-shrink:0;transition:all .18s;}
+.back-btn:active{transform:scale(.88);background:var(--glass3);}
+.inner-title{font-size:19px;font-weight:700;flex:1;letter-spacing:-.02em;}
+.inner-hint{font-size:11px;color:var(--sub);}
+
+/* CALENDAR */
+#calScreen{background:transparent;z-index:1;}
+.cal-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:14px 12px 80px;}
+.cal-scroll::-webkit-scrollbar{display:none;}
+.month-nav{display:flex;align-items:center;gap:8px;padding:0 2px 12px;}
+.mnav-btn{width:34px;height:34px;border-radius:50%;background:var(--glass);border:1px solid var(--border);color:var(--sub);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .18s;backdrop-filter:blur(10px);}
+.mnav-btn:active{transform:scale(.88);}
+.mnav-btn:disabled{opacity:.25;cursor:not-allowed;}
+.month-lbl{font-size:17px;font-weight:700;flex:1;text-align:center;letter-spacing:-.02em;}
+.dlabels{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;}
+.dlbl{text-align:center;font-size:10px;color:var(--muted);padding:3px 0;font-weight:500;}
+.dlbl.sun{color:var(--sunday-text);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cday{border-radius:11px;background:var(--glass);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:6px 2px 5px;cursor:pointer;position:relative;min-height:44px;transition:all .18s var(--ease);backdrop-filter:blur(8px);}
+.cday:active{transform:scale(.9);}
+.cday.empty,.cday.disabled{background:transparent;border-color:transparent;cursor:default;opacity:.3;}
+.cday.disabled{opacity:.15;}
+.cday.sunday{background:var(--sunday);border-color:rgba(255,69,58,.15);}
+.cday.sunday .dnum{color:var(--sunday-text);}
+.cday.today{border-color:var(--accent);box-shadow:0 0 10px var(--accent-glow);}
+.cday.selected{background:var(--accent-bg);border-color:var(--accent);}
+.cday.holiday{background:var(--red-bg);border-color:var(--red-border);}
+.cday.holiday .dnum{color:var(--red);}
+.cday.exam{background:var(--amber-bg);border-color:rgba(255,159,10,.3);}
+.cday.exam .dnum{color:var(--amber);}
+.cday.has-notes{background:rgba(110,106,240,.12);border-color:rgba(110,106,240,.35);}
+.cday.has-notes .dnum{color:#a78bfa;}
+.cday.has-notes::after{content:'✦';position:absolute;bottom:3px;font-size:7px;color:#a78bfa;}
+.dnum{font-size:12px;font-weight:500;}
+.legend{display:flex;gap:10px;padding:10px 2px 6px;flex-wrap:wrap;}
+.leg{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--sub);}
+.leg-dot{width:7px;height:7px;border-radius:50%;}
+.leg-sq{width:8px;height:8px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:6px;}
+
+/* DAY PANEL */
+.day-panel{margin-top:14px;}
+.day-hint{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
+.day-card{background:var(--glass);border:1px solid var(--border2);border-radius:20px;overflow:visible;position:relative;backdrop-filter:blur(20px);animation:cardIn .3s var(--spring) both;}
+@keyframes cardIn{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:none;}}
+.day-top{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);}
+.day-title{font-size:14px;font-weight:600;letter-spacing:-.01em;}
+.day-right{display:flex;align-items:center;gap:8px;}
+.badge{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;border:1px solid;}
+.badge-class{background:var(--green-bg);color:var(--green);border-color:rgba(48,209,88,.25);}
+.badge-exam{background:var(--amber-bg);color:var(--amber);border-color:rgba(255,159,10,.25);}
+.badge-holiday{background:var(--red-bg);color:var(--red);border-color:var(--red-border);}
+.badge-sunday{background:var(--sunday);color:var(--sunday-text);border-color:rgba(255,69,58,.2);}
+.three-dot{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1;}
+.dropdown{position:absolute;right:10px;top:46px;background:rgba(20,20,28,.97);border:1px solid var(--border2);border-radius:14px;z-index:50;min-width:195px;box-shadow:0 20px 50px rgba(0,0,0,.65);overflow:hidden;backdrop-filter:blur(30px);animation:dropIn .2s var(--spring) both;}
+@keyframes dropIn{from{opacity:0;transform:scale(.88) translateY(-8px);}to{opacity:1;transform:none;}}
+.dd-item{padding:12px 16px;font-size:13px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+.dd-item:last-child{border-bottom:none;}
+.dd-item:active{background:var(--glass2);}
+.dd-item.warn{color:var(--amber);}
+.dd-item.danger{color:var(--red);}
+.periods-row{display:flex;gap:5px;overflow-x:auto;padding:9px 14px;border-bottom:1px solid var(--border);scrollbar-width:none;}
+.periods-row::-webkit-scrollbar{display:none;}
+.per-pill{flex-shrink:0;font-size:11px;padding:4px 10px;border-radius:20px;background:var(--glass2);border:1px solid var(--border);color:var(--sub);font-weight:500;}
+.per-pill.practical{background:rgba(191,90,242,.1);border-color:rgba(191,90,242,.3);color:var(--purple);}
+.notes-area{padding:13px 16px;}
+.sub-note{margin-bottom:14px;animation:fadeUp .25s var(--ease) both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}
+.sub-note:last-child{margin-bottom:0;}
+.sub-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+.sub-lbl-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.sub-lbl-edit{margin-left:auto;font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--accent);cursor:pointer;font-family:var(--font);font-weight:600;transition:all .18s;}
+.note-text{font-size:13px;color:rgba(255,255,255,.82);line-height:1.7;white-space:pre-wrap;background:rgba(255,255,255,.03);border-radius:11px;padding:10px 12px;border:1px solid var(--border);}
+.add-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.add-chip{font-size:12px;padding:5px 12px;border-radius:20px;border:1px dashed var(--border2);background:transparent;color:var(--sub);cursor:pointer;font-family:var(--font);transition:all .18s;}
+.add-chip:active{background:var(--glass2);border-style:solid;}
+.no-notes{font-size:13px;color:var(--muted);text-align:center;padding:20px 0;}
+.ch-started-sec{padding:11px 16px;border-top:1px solid var(--border);}
+.sec-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.ch-started-list{display:flex;flex-direction:column;gap:5px;}
+.ch-si{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--glass);border-radius:11px;border:1px solid var(--border);}
+.ch-tag{font-size:10px;padding:2px 7px;border-radius:20px;flex-shrink:0;font-weight:700;}
+.ch-del{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0;}
+.empty-day{text-align:center;padding:26px 14px;}
+.empty-icon{font-size:30px;margin-bottom:10px;}
+.empty-title{font-size:15px;font-weight:600;letter-spacing:-.01em;}
+.empty-sub{font-size:13px;color:var(--sub);margin-top:5px;}
+.exam-area{padding:13px 16px;}
+.exam-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.exam-title{font-size:13px;font-weight:600;color:var(--amber);}
+.upload-btn{font-size:12px;padding:6px 13px;border-radius:20px;border:1px solid rgba(255,159,10,.4);background:rgba(255,159,10,.1);color:var(--amber);cursor:pointer;font-family:var(--font);font-weight:600;transition:all .18s;}
+.photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px;}
+.photo-thumb{position:relative;border-radius:12px;overflow:hidden;border:1px solid rgba(255,159,10,.3);aspect-ratio:3/4;cursor:pointer;transition:transform .18s;}
+.photo-thumb:active{transform:scale(.97);}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.photo-pg{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:white;font-size:10px;padding:10px 7px 5px;text-align:center;font-weight:500;}
+.photo-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.65);border:none;border-radius:50%;width:22px;height:22px;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.upload-zone{border:2px dashed rgba(255,159,10,.28);border-radius:14px;padding:26px;text-align:center;cursor:pointer;margin-bottom:8px;transition:all .18s;}
+.upload-zone:active{background:rgba(255,159,10,.05);}
+.upload-zone-t{font-size:13px;color:var(--amber);margin-top:7px;font-weight:600;}
+.upload-zone-s{font-size:12px;color:var(--sub);margin-top:3px;}
+
+/* SYLLABUS */
+#syllabusScreen{background:transparent;z-index:1;}
+.syl-scroll{flex:1;overflow-y:auto;scrollbar-width:none;}
+.syl-scroll::-webkit-scrollbar{display:none;}
+.sub-cards{padding:14px 14px 40px;display:flex;flex-direction:column;gap:10px;}
+.sub-card{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:17px 18px;display:flex;align-items:center;gap:13px;cursor:pointer;backdrop-filter:blur(20px);transition:all .22s var(--ease);animation:fadeUp .35s var(--ease) both;}
+.sub-card:active{transform:scale(.97);}
+.sub-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.sub-info{flex:1;}
+.sub-name{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-bottom:2px;}
+.sub-meta{font-size:12px;color:var(--sub);margin-bottom:7px;}
+.sub-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.sub-bar-fill{height:100%;border-radius:2px;transition:width .5s var(--ease);}
+.ch-list-wrap{padding:0 0 40px;}
+.ch-list-head{padding:12px 14px;border-bottom:1px solid var(--border);}
+.ch-prog-lbl{font-size:12px;color:var(--sub);margin-bottom:7px;}
+.ch-prog-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.ch-prog-fill{height:100%;border-radius:2px;transition:width .5s var(--ease);}
+/* Chemistry sections */
+.chem-section-hdr{padding:10px 14px 6px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--s1);border-bottom:1px solid var(--border);border-top:1px solid var(--border);display:flex;align-items:center;gap:7px;}
+.chem-section-dot{width:6px;height:6px;border-radius:50%;}
+.ch-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);animation:fadeUp .25s var(--ease) both;transition:background .15s;}
+.ch-check{width:22px;height:22px;border:1.5px solid var(--border2);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all .25s var(--spring);}
+.ch-check.done{background:var(--green);border-color:var(--green);box-shadow:0 0 10px var(--green-glow);transform:scale(1.05);}
+.ch-check.locked{cursor:default;opacity:.4;}
+.ch-tick{font-size:12px;color:white;font-weight:800;opacity:0;transform:scale(0);transition:all .2s var(--spring);}
+.ch-check.done .ch-tick{opacity:1;transform:scale(1);}
+.ch-row-name{font-size:13px;flex:1;line-height:1.35;transition:all .2s;}
+.ch-row-name.done{text-decoration:line-through;color:var(--muted);}
+
+/* STUDIED */
+#studiedScreen{background:transparent;z-index:1;}
+.studied-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:14px 13px 40px;}
+.studied-scroll::-webkit-scrollbar{display:none;}
+.studied-mn{display:flex;align-items:center;gap:8px;padding:0 2px 14px;}
+.studied-entries{display:flex;flex-direction:column;gap:9px;}
+.studied-entry{background:var(--glass);border:1px solid var(--border2);border-radius:16px;padding:13px 15px;backdrop-filter:blur(20px);animation:fadeUp .3s var(--ease) both;}
+.studied-date{font-size:11px;color:var(--sub);font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;letter-spacing:.02em;}
+.studied-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.studied-chip{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600;}
+.no-studied{text-align:center;padding:44px 14px;color:var(--muted);font-size:13px;}
+
+/* BOARD EXAM PDFs */
+#boardScreen{background:transparent;z-index:1;}
+.board-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:14px 14px 40px;}
+.board-scroll::-webkit-scrollbar{display:none;}
+.board-intro{font-size:13px;color:var(--sub);line-height:1.6;padding:0 0 16px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.pdf-cards{display:flex;flex-direction:column;gap:10px;}
+.pdf-card{background:var(--glass);border:1px solid var(--border2);border-radius:18px;padding:17px 18px;display:flex;align-items:center;gap:14px;backdrop-filter:blur(20px);animation:fadeUp .35s var(--ease) both;cursor:pointer;transition:all .22s var(--ease);}
+.pdf-card:active{transform:scale(.97);}
+.pdf-icon{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.pdf-info{flex:1;}
+.pdf-name{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-bottom:3px;}
+.pdf-desc{font-size:12px;color:var(--sub);}
+.pdf-dl{font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--accent);cursor:pointer;font-family:var(--font);font-weight:600;transition:all .18s;white-space:nowrap;flex-shrink:0;}
+.pdf-dl:active{background:var(--accent-bg);}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center;z-index:300;backdrop-filter:blur(8px);animation:bgIn .22s ease both;}
+@keyframes bgIn{from{opacity:0;}to{opacity:1;}}
+.modal{background:rgba(18,18,24,.98);border:1px solid var(--border2);border-radius:22px 22px 0 0;padding:6px 18px 40px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;animation:modalUp .32s var(--spring) both;}
+@keyframes modalUp{from{transform:translateY(100%);}to{transform:none;}}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 18px;}
+.modal h3{font-size:18px;font-weight:700;margin-bottom:14px;letter-spacing:-.02em;}
+.modal label{font-size:11px;color:var(--sub);display:block;margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.modal input,.modal textarea,.modal select{width:100%;font-size:15px;padding:12px 13px;border:1px solid var(--border2);border-radius:12px;background:rgba(255,255,255,.05);color:var(--text);margin-bottom:10px;font-family:var(--font);outline:none;transition:border-color .18s;}
+.modal input:focus,.modal textarea:focus,.modal select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+.modal textarea{resize:vertical;min-height:95px;}
+.mbtns{display:flex;gap:8px;margin-top:8px;}
+.mbtns button{flex:1;padding:13px;border-radius:13px;font-size:15px;font-weight:700;cursor:pointer;border:none;font-family:var(--font);transition:all .18s;}
+.mbtns button:active{transform:scale(.97);}
+.bcnl{background:var(--glass2);color:var(--sub);}
+.bsave{background:var(--accent);color:white;box-shadow:0 4px 18px var(--accent-glow);}
+.bwarn{background:var(--amber);color:#000;}
+.perr{font-size:12px;color:var(--red);margin-bottom:8px;text-align:center;}
+
+/* LIGHTBOX */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:400;backdrop-filter:blur(20px);animation:bgIn .2s ease both;}
+.lb-img{max-width:96%;max-height:72vh;object-fit:contain;border-radius:10px;animation:cardIn .28s var(--spring) both;}
+.lb-nav{display:flex;gap:12px;margin-top:14px;}
+.lb-btn{background:rgba(255,255,255,.12);border:none;border-radius:12px;padding:10px 22px;color:white;font-size:14px;cursor:pointer;font-family:var(--font);font-weight:600;backdrop-filter:blur(10px);transition:all .18s;}
+.lb-btn:active{transform:scale(.96);background:rgba(255,255,255,.18);}
+.lb-close{position:fixed;top:18px;right:18px;background:rgba(255,255,255,.12);border:none;border-radius:50%;width:36px;height:36px;color:white;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;}
+.lb-lbl{color:rgba(255,255,255,.4);font-size:12px;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div class="bg-blob"></div>
+<input type="file" id="fileIn" accept="image/*" multiple style="display:none" onchange="handleFiles(event)">
+<div id="lbEl"></div>
+<div id="mRoot"></div>
+
+<!-- ══ HOME ══ -->
+<div class="screen" id="homeScreen">
+  <div class="home-scroll">
+    <div class="home-hero">
+      <div class="home-chip"><div class="live-pulse"></div>Science · Class XI-B</div>
+      <div class="home-title">Class<span class="acc">Track</span></div>
+      <div class="home-sub">Your group's shared class diary — notes, chapters and exams in one place.</div>
+      <div class="status-row"><div class="live-pulse" id="sDot"></div><span id="sTxt">Connecting...</span></div>
+    </div>
+    <div class="edit-bar">
+      <button class="edit-toggle" id="editToggle" onclick="openEdit()">
+        <span class="lock-icon">🔒</span><span id="editLbl">Edit mode — locked</span>
+      </button>
+    </div>
+    <div class="nav-cards">
+      <div class="nav-card" style="--nc:rgba(110,106,240,.1);" onclick="goTo('calScreen')">
+        <div class="card-icon" style="background:rgba(110,106,240,.1);border:1px solid rgba(110,106,240,.2);">📅</div>
+        <div class="card-content"><div class="card-name">Calendar</div><div class="card-desc">Daily notes, exam papers and holidays</div></div>
+        <div class="card-arrow">›</div>
+      </div>
+      <div class="nav-card" style="--nc:rgba(48,209,88,.08);" onclick="goTo('syllabusScreen')">
+        <div class="card-icon" style="background:rgba(48,209,88,.1);border:1px solid rgba(48,209,88,.2);">📚</div>
+        <div class="card-content">
+          <div class="card-name">Syllabus</div>
+          <div class="card-desc">Track chapter completion across all subjects</div>
+          <div class="card-prog"><div class="card-prog-fill" id="overallFill" style="background:var(--green);width:0%"></div></div>
+        </div>
+        <div class="card-arrow">›</div>
+      </div>
+      <div class="nav-card" style="--nc:rgba(255,159,10,.08);" onclick="goTo('studiedScreen')">
+        <div class="card-icon" style="background:rgba(255,159,10,.1);border:1px solid rgba(255,159,10,.2);">🗒️</div>
+        <div class="card-content"><div class="card-name">Chapters Studied</div><div class="card-desc">See which chapters were started each day</div></div>
+        <div class="card-arrow">›</div>
+      </div>
+      <div class="nav-card" style="--nc:rgba(191,90,242,.08);" onclick="goTo('boardScreen')">
+        <div class="card-icon" style="background:rgba(191,90,242,.1);border:1px solid rgba(191,90,242,.2);">📋</div>
+        <div class="card-content"><div class="card-name">11th Board Exam</div><div class="card-desc">Download JAC official syllabus PDFs — all 6 subjects</div></div>
+        <div class="card-arrow">›</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CALENDAR ══ -->
+<div class="screen hidden-below" id="calScreen">
+  <div class="inner-hdr">
+    <div class="back-btn" onclick="goHome()">‹</div>
+    <div class="inner-title">Calendar</div>
+    <div class="inner-hint" id="calEditHint"></div>
+  </div>
+  <div class="cal-scroll">
+    <div class="month-nav">
+      <button class="mnav-btn" id="prevBtn" onclick="changeMonth(-1)">‹</button>
+      <div class="month-lbl" id="monthLbl"></div>
+      <button class="mnav-btn" id="nextBtn" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="dlabels">
+      <div class="dlbl sun">S</div><div class="dlbl">M</div><div class="dlbl">T</div>
+      <div class="dlbl">W</div><div class="dlbl">T</div><div class="dlbl">F</div><div class="dlbl">S</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--sunday-text)"></div>Sunday</div>
+      <div class="leg"><div class="leg-sq" style="background:rgba(110,106,240,.2);color:#a78bfa;">✦</div>Has notes</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--amber)"></div>Exam</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>Holiday</div>
+    </div>
+    <div class="day-panel" id="dayPanel"><div class="day-hint">Tap a date to view</div></div>
+  </div>
+</div>
+
+<!-- ══ SYLLABUS ══ -->
+<div class="screen hidden-below" id="syllabusScreen">
+  <div class="inner-hdr">
+    <div class="back-btn" id="sylBackBtn" onclick="sylBack()">‹</div>
+    <div class="inner-title" id="sylTitle">Syllabus</div>
+    <div class="inner-hint" id="sylHint"></div>
+  </div>
+  <div class="syl-scroll" id="sylContent"></div>
+</div>
+
+<!-- ══ STUDIED ══ -->
+<div class="screen hidden-below" id="studiedScreen">
+  <div class="inner-hdr">
+    <div class="back-btn" onclick="goHome()">‹</div>
+    <div class="inner-title">Chapters Studied</div>
+  </div>
+  <div class="studied-scroll">
+    <div class="studied-mn">
+      <button class="mnav-btn" onclick="changeStudiedM(-1)">‹</button>
+      <div class="month-lbl" id="studiedMon"></div>
+      <button class="mnav-btn" onclick="changeStudiedM(1)">›</button>
+    </div>
+    <div id="studiedList"></div>
+  </div>
+</div>
+
+<!-- ══ BOARD EXAM PDFs ══ -->
+<div class="screen hidden-below" id="boardScreen">
+  <div class="inner-hdr">
+    <div class="back-btn" onclick="goHome()">‹</div>
+    <div class="inner-title">11th Board Exam</div>
+  </div>
+  <div class="board-scroll">
+    <div class="board-intro">Official JAC Class 11 split-up syllabus PDFs — developed by Jharkhand Council of Educational Research & Training (JCERT). Tap Download to save any PDF to your device.</div>
+    <div class="pdf-cards" id="pdfCards"></div>
+  </div>
+</div>
+
+<script>
+// ══ FIREBASE ══
+const FB = {
+  apiKey:"AIzaSyAhkiIog4l43aFyyreXD_HaoF3H3_bqrPM",
+  authDomain:"classtrack-2026-27.firebaseapp.com",
+  databaseURL:"https://classtrack-2026-27-default-rtdb.firebaseio.com",
+  projectId:"classtrack-2026-27",
+  storageBucket:"classtrack-2026-27.firebasestorage.app",
+  messagingSenderId:"367988685226",
+  appId:"1:367988685226:web:8264bc6d7335f957e3d3d3"
+};
+const PWS=["9b871512327c09ce91dd649b3f96a63b7408ef267c8cc5710114e629730cb61f","d86580a57f7bf542e85202283cb845953c9d28f80a8e651db08b2fc0b2d6a731","5966abd0cbfc86f98a186531b2b4ee5f6e910120ce13222f98207203dfc9a9a2","8efbbe9bc19ad2e043c6cdb187c0a0fedde70b6458443ce0b5648ec04ccf4cdf"];
+
+// ══ SUBJECTS & CHAPTERS (JAC 2026 NCERT) ══
+const SUBS=["Physics","Chemistry","Maths","Economics","CS","English"];
+const SUB_COLORS={Physics:"#6e6af0",Chemistry:"#30d158",Maths:"#ff9f0a",Economics:"#bf5af2",CS:"#0a84ff",English:"#ff6b60"};
+const SUB_EMOJI={Physics:"⚡",Chemistry:"🧪",Maths:"📐",Economics:"📊",CS:"💻",English:"📖"};
+
+// Chemistry chapters with section labels
+const CHEM_SECTIONS=[
+  {label:"Physical Chemistry",color:"#0a84ff",chapters:[
+    "Ch 1 — Some Basic Concepts of Chemistry",
+    "Ch 2 — Structure of Atom",
+    "Ch 5 — Thermodynamics",
+    "Ch 6 — Equilibrium",
+    "Ch 7 — Redox Reactions",
+  ]},
+  {label:"Inorganic Chemistry",color:"#ff9f0a",chapters:[
+    "Ch 3 — Classification of Elements & Periodicity",
+    "Ch 4 — Chemical Bonding and Molecular Structure",
+  ]},
+  {label:"Organic Chemistry",color:"#30d158",chapters:[
+    "Ch 8 — Organic Chemistry: Basic Principles",
+    "Ch 9 — Hydrocarbons",
+  ]},
+];
+// flat chemistry list for indexing
+const CHEM_FLAT=CHEM_SECTIONS.flatMap(s=>s.chapters);
+
+const CHAPTERS={
+  Physics:[
+    "Ch 1 — Units and Measurements",
+    "Ch 2 — Motion in a Straight Line",
+    "Ch 3 — Motion in a Plane",
+    "Ch 4 — Laws of Motion",
+    "Ch 5 — Work, Energy and Power",
+    "Ch 6 — System of Particles and Rotational Motion",
+    "Ch 7 — Gravitation",
+    "Ch 8 — Mechanical Properties of Solids",
+    "Ch 9 — Mechanical Properties of Fluids",
+    "Ch 10 — Thermal Properties of Matter",
+    "Ch 11 — Thermodynamics",
+    "Ch 12 — Kinetic Theory",
+    "Ch 13 — Oscillations",
+    "Ch 14 — Waves",
+  ],
+  Chemistry:CHEM_FLAT,
+  Maths:[
+    "Ch 1 — Sets",
+    "Ch 2 — Relations and Functions",
+    "Ch 3 — Trigonometric Functions",
+    "Ch 4 — Complex Numbers and Quadratic Equations",
+    "Ch 5 — Linear Inequalities",
+    "Ch 6 — Permutations and Combinations",
+    "Ch 7 — Binomial Theorem",
+    "Ch 8 — Sequences and Series",
+    "Ch 9 — Straight Lines",
+    "Ch 10 — Conic Sections",
+    "Ch 11 — Introduction to 3D Geometry",
+    "Ch 12 — Limits and Derivatives",
+    "Ch 13 — Statistics",
+    "Ch 14 — Probability",
+  ],
+  Economics:[
+    "Ch 1 — Introduction to Statistics in Economics",
+    "Ch 2 — Collection of Data",
+    "Ch 3 — Organisation of Data",
+    "Ch 4 — Presentation of Data",
+    "Ch 5 — Measures of Central Tendency",
+    "Ch 6 — Measures of Dispersion",
+    "Ch 7 — Correlation",
+    "Ch 8 — Index Numbers",
+    "Ch 9 — Use of Statistical Tools",
+    "Ch 10 — Introduction to Microeconomics",
+    "Ch 11 — Consumer Equilibrium and Demand",
+    "Ch 12 — Producer Behaviour and Supply",
+    "Ch 13 — Forms of Market and Price Determination",
+  ],
+  CS:[
+    "Ch 1 — Computer Systems and Organisation",
+    "Ch 2 — Computational Thinking & Programming — Basics",
+    "Ch 3 — Computational Thinking — Flow of Control",
+    "Ch 4 — Computational Thinking — Iterative Statements",
+    "Ch 5 — Strings and Lists",
+    "Ch 6 — Lists (Finish) and Tuples",
+    "Ch 7 — Dictionary and Python Modules",
+    "Ch 8 — Society, Law and Ethics",
+  ],
+  English:[
+    "Hornbill — Ch 1: The Portrait of a Lady",
+    "Hornbill — Poem: A Photograph",
+    "Hornbill — Ch 2: We're Not Afraid to Die",
+    "Hornbill — Ch 3: Discovering Tut",
+    "Hornbill — Poem: The Laburnum Top",
+    "Hornbill — Poem: The Voice of the Rain",
+    "Hornbill — Ch 4: The Ailing Planet",
+    "Hornbill — Poem: Childhood",
+    "Hornbill — Ch 5: The Adventure",
+    "Hornbill — Ch 6: Silk Road",
+    "Hornbill — Poem: Father to Son",
+    "Snapshots — Ch 1: The Summer of the Beautiful White Horse",
+    "Snapshots — Ch 2: The Address",
+    "Snapshots — Ch 3: Mother's Day",
+    "Snapshots — Ch 4: Birth",
+    "Snapshots — Ch 5: The Tale of Melon City",
+    "Writing Skills — Note-making & Summary",
+    "Writing Skills — Letter Writing",
+    "Writing Skills — Creative Writing",
+    "Grammar — Integrated Grammar Practice",
+  ],
+};
+
+const TT={1:["Eng","Chem","Comp/Eco","Phy","Maths/Bio","Chem"],2:["Maths/Bio","Comp/Eco","Phy","Eng","Chem","Phy"],3:["Eng","Phy","Practical","Practical","Chem","Maths/Bio"],4:["Practical","Practical","Chem","Phy","Comp/Eco","Maths/Bio"],5:["Phy","Maths/Bio","Chem","Comp/Eco","Maths/Bio","Eng"],6:["Maths/Bio","Chem","Eng","Phy","Chem","Maths/Bio"]};
+const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+// Calendar range: June 2026 → March 2027
+const CAL_START={y:2026,m:5}; // June = month 5 (0-indexed)
+const CAL_END={y:2027,m:2};   // March 2027
+const FIRST_DATE="2026-06-23"; // classes started
+
+// PDF info — files should be uploaded to GitHub repo alongside index.html
+const PDFS=[
+  {sub:"Physics",emoji:"⚡",color:"#6e6af0",desc:"JAC Class 11 Physics — Units, Kinematics, Laws of Motion, Thermodynamics, Waves & more",file:"JAC-Class11-Physics-Syllabus.pdf"},
+  {sub:"Chemistry",emoji:"🧪",color:"#30d158",desc:"JAC Class 11 Chemistry — Physical, Organic & Inorganic chemistry split-up syllabus",file:"JAC-Class11-Chemistry-Syllabus.pdf"},
+  {sub:"Mathematics",emoji:"📐",color:"#ff9f0a",desc:"JAC Class 11 Mathematics — Sets, Algebra, Coordinate Geometry, Calculus & Probability",file:"JAC-Class11-Mathematics-Syllabus.pdf"},
+  {sub:"Economics",emoji:"📊",color:"#bf5af2",desc:"JAC Class 11 Economics — Statistics for Economics & Introductory Microeconomics",file:"JAC-Class11-Economics-Syllabus.pdf"},
+  {sub:"Computer Science",emoji:"💻",color:"#0a84ff",desc:"JAC Class 11 Computer Science — Python programming, CS concepts & Society, Law and Ethics",file:"JAC-Class11-Computer-Syllabus.pdf"},
+  {sub:"English Core",emoji:"📖",color:"#ff6b60",desc:"JAC Class 11 English Core — Hornbill, Snapshots, Writing Skills & Grammar",file:"JAC-Class11-EnglishCore-Syllabus.pdf"},
+];
+
+let curM=5,curY=2026; // Start at June 2026
+let studiedM=new Date().getMonth(),studiedY=new Date().getFullYear();
+let selDate=null,editMode=false,ddOpen=false,lbIdx=0,activeSylSub=null;
+let data={},db=null,dbRef=null;
+let failCount=parseInt(sessionStorage.getItem('ct_f')||'0');
+let lockedUntil=parseInt(sessionStorage.getItem('ct_l')||'0');
+let editTimer=null;
+const today=new Date();
+const fmt=(y,m,d)=>y+'-'+(m+1).toString().padStart(2,'0')+'-'+d.toString().padStart(2,'0');
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ══ FIREBASE ══
+function initFB(){
+  try{
+    firebase.initializeApp(FB);
+    db=firebase.database();dbRef=db.ref('classtrack');
+    setSt('syncing');
+    dbRef.on('value',snap=>{
+      data=snap.val()||{};
+      setSt('live');
+      updateOverall();
+      renderCal();
+      if(selDate)renderDay();
+      const syl=document.getElementById('syllabusScreen');
+      if(isVisible(syl))renderSyllabus();
+      const std=document.getElementById('studiedScreen');
+      if(isVisible(std))renderStudied();
+    },()=>setSt('error'));
+  }catch(e){setSt('error');try{data=JSON.parse(localStorage.getItem('ct_d')||'{}');}catch(e){}renderCal();}
+}
+function isVisible(el){return el.style.display!=='none'&&!el.classList.contains('hidden-below')&&!el.classList.contains('out');}
+function saveD(path,val){
+  if(db)db.ref('classtrack/'+path).set(val).catch(()=>{});
+  else try{localStorage.setItem('ct_d',JSON.stringify(data));}catch(e){}
+}
+function setSt(s){
+  const dot=document.getElementById('sDot'),txt=document.getElementById('sTxt');
+  if(s==='live'){dot.style.background='var(--green)';dot.style.boxShadow='0 0 6px var(--green)';txt.textContent='Live — synced';}
+  else if(s==='syncing'){dot.style.background='var(--amber)';dot.style.boxShadow='none';txt.textContent='Connecting...';}
+  else{dot.style.background='var(--red)';dot.style.boxShadow='none';txt.textContent='Offline';}
+}
+function updateOverall(){
+  const prog=data['progress']||{};
+  let total=0,done=0;
+  SUBS.forEach(s=>{total+=CHAPTERS[s].length;done+=CHAPTERS[s].filter((_,i)=>(prog[s]||{})[i]).length;});
+  const pct=total?Math.round(done/total*100):0;
+  const el=document.getElementById('overallFill');if(el)el.style.width=pct+'%';
+}
+
+// ══ NAVIGATION ══
+function goTo(id){
+  const home=document.getElementById('homeScreen');
+  home.classList.add('out');
+  setTimeout(()=>{
+    home.style.display='none';home.classList.remove('out');
+    const scr=document.getElementById(id);
+    scr.style.display='flex';scr.classList.remove('hidden-below');
+    if(id==='calScreen')renderCal();
+    if(id==='syllabusScreen')renderSyllabus();
+    if(id==='studiedScreen')renderStudied();
+    if(id==='boardScreen')renderBoard();
+  },250);
+}
+function goHome(){
+  ['calScreen','syllabusScreen','studiedScreen','boardScreen'].forEach(id=>{
+    const scr=document.getElementById(id);
+    if(scr.style.display!=='none'&&!scr.classList.contains('hidden-below')){
+      scr.classList.add('hidden-below');
+      setTimeout(()=>{scr.style.display='none';scr.classList.remove('hidden-below');},300);
+    }
+  });
+  const home=document.getElementById('homeScreen');
+  home.style.display='flex';home.classList.remove('out');
+  ddOpen=false;activeSylSub=null;updateOverall();
+}
+
+// ══ CALENDAR ══
+function isInRange(y,m){
+  if(y<CAL_START.y||(y===CAL_START.y&&m<CAL_START.m))return false;
+  if(y>CAL_END.y||(y===CAL_END.y&&m>CAL_END.m))return false;
+  return true;
+}
+function renderCal(){
+  document.getElementById('monthLbl').textContent=MONTHS[curM]+' '+curY;
+  document.getElementById('prevBtn').disabled=!isInRange(curY,curM-1<0?curM-1+12:curM-1);
+  document.getElementById('nextBtn').disabled=!isInRange(curY,curM+1>11?curM+1-12:curM+1);
+  // fix prev/next year
+  let py=curY,pm=curM-1;if(pm<0){pm=11;py--;}
+  let ny=curY,nm=curM+1;if(nm>11){nm=0;ny++;}
+  document.getElementById('prevBtn').disabled=!isInRange(py,pm);
+  document.getElementById('nextBtn').disabled=!isInRange(ny,nm);
+  document.getElementById('calEditHint').textContent=editMode?'✎ editing':'';
+  const g=document.getElementById('calGrid');g.innerHTML='';
+  const first=new Date(curY,curM,1).getDay(),total=new Date(curY,curM+1,0).getDate();
+  for(let i=0;i<first;i++){const e=document.createElement('div');e.className='cday empty';g.appendChild(e);}
+  for(let d=1;d<=total;d++){
+    const dk=fmt(curY,curM,d),dd=data[dk]||{};
+    const el=document.createElement('div');
+    const dow=new Date(curY,curM,d).getDay();
+    const isSun=dow===0;
+    const isDisabled=dk<FIRST_DATE;
+    let cls='cday';
+    if(isDisabled)cls+=' disabled';
+    else if(isSun)cls+=' sunday';
+    if(d===today.getDate()&&curM===today.getMonth()&&curY===today.getFullYear())cls+=' today';
+    if(!isDisabled&&!isSun){
+      if(dd.type==='holiday')cls+=' holiday';
+      else if(dd.type==='exam')cls+=' exam';
+      else{
+        const hasNotes=dd.notes&&Object.values(dd.notes).some(v=>v);
+        const hasCh=dd.chapters&&dd.chapters.length;
+        const hasPhotos=dd.photos&&dd.photos.length;
+        if(hasNotes||hasCh||hasPhotos)cls+=' has-notes';
+      }
+    }
+    if(selDate===dk)cls+=' selected';
+    el.className=cls;
+    el.innerHTML='<span class="dnum">'+d+'</span>';
+    if(!isDisabled)el.onclick=()=>selectDay(dk);
+    g.appendChild(el);
+  }
+}
+function selectDay(dk){selDate=dk;ddOpen=false;renderCal();renderDay();}
+function changeMonth(d){
+  let ny=curY,nm=curM+d;
+  if(nm>11){nm=0;ny++;}if(nm<0){nm=11;ny--;}
+  if(!isInRange(ny,nm))return;
+  curM=nm;curY=ny;selDate=null;renderCal();
+  document.getElementById('dayPanel').innerHTML='<div class="day-hint">Tap a date to view</div>';
+}
+
+function renderDay(){
+  const panel=document.getElementById('dayPanel');
+  if(!selDate){panel.innerHTML='<div class="day-hint">Tap a date to view</div>';return;}
+  const dd=data[selDate]||{},dow=new Date(selDate+'T00:00:00').getDay();
+  const d=new Date(selDate+'T00:00:00'),lbl=DAYS[dow]+', '+d.getDate()+' '+MONTHS[d.getMonth()];
+  const isSun=dow===0,dtype=dd.type||'class';
+  const badge=isSun?'<span class="badge badge-sunday">Sunday</span>':dtype==='holiday'?'<span class="badge badge-holiday">Holiday</span>':dtype==='exam'?'<span class="badge badge-exam">Exam</span>':'<span class="badge badge-class">Class</span>';
+  let ddHtml='';
+  if(ddOpen&&editMode&&!isSun){
+    ddHtml='<div class="dropdown" onclick="event.stopPropagation()">';
+    ddHtml+=dtype==='exam'?'<div class="dd-item warn" onclick="setType(\'class\')">✕ Remove exam</div>':'<div class="dd-item warn" onclick="setType(\'exam\')">📝 Mark as exam</div>';
+    ddHtml+=dtype==='holiday'?'<div class="dd-item danger" onclick="setType(\'class\')">✕ Remove holiday</div>':'<div class="dd-item danger" onclick="setType(\'holiday\')">🏖️ Mark as holiday</div>';
+    ddHtml+='<div class="dd-item" onclick="openAddChapter()">📖 Chapter started today</div>';
+    ddHtml+='</div>';
+  }
+  let html='<div class="day-card"><div class="day-top"><span class="day-title">'+lbl+'</span><div class="day-right">'+badge+(editMode&&!isSun?'<button class="three-dot" onclick="toggleDd(event)">⋮</button>':'')+'</div></div>'+ddHtml;
+  if(isSun)html+='<div class="empty-day"><div class="empty-icon">☀️</div><div class="empty-title" style="color:var(--sunday-text)">Sunday</div><div class="empty-sub">No school today</div></div>';
+  else if(dtype==='holiday')html+='<div class="empty-day"><div class="empty-icon">🏖️</div><div class="empty-title" style="color:var(--red)">Holiday</div><div class="empty-sub">No classes today</div></div>';
+  else if(dtype==='exam')html+=buildExam(dd);
+  else{
+    const periods=TT[dow]||[];
+    if(periods.length)html+='<div class="periods-row">'+periods.map((p,i)=>'<div class="per-pill'+(p==='Practical'?' practical':'')+'"><span style="opacity:.4;font-size:10px;">'+(i+1)+'.</span> '+p+'</div>').join('')+'</div>';
+    const notes=dd.notes||{},hasAny=SUBS.some(s=>notes[s]);
+    html+='<div class="notes-area">';
+    if(hasAny){SUBS.forEach((s,idx)=>{if(!notes[s])return;html+='<div class="sub-note" style="animation-delay:'+(idx*.05)+'s"><div class="sub-lbl"><div class="sub-lbl-dot" style="background:'+SUB_COLORS[s]+'"></div>'+s+(editMode?'<button class="sub-lbl-edit" onclick="openNote(\''+s+'\')">Edit</button>':'')+'</div><div class="note-text">'+esc(notes[s])+'</div></div>';});}
+    else html+='<div class="no-notes">'+(editMode?'No notes yet':'No notes for this day')+'</div>';
+    if(editMode){const miss=SUBS.filter(s=>!notes[s]);if(miss.length)html+='<div class="add-row">'+miss.map(s=>'<button class="add-chip" onclick="openNote(\''+s+'\')">+ '+s+'</button>').join('')+'</div>';}
+    html+='</div>';
+    const chs=dd.chapters||[];
+    if(chs.length)html+='<div class="ch-started-sec"><div class="sec-lbl">Started today</div><div class="ch-started-list">'+chs.map((ch,i)=>'<div class="ch-si"><span class="ch-tag" style="background:'+SUB_COLORS[ch.sub]+'18;color:'+SUB_COLORS[ch.sub]+';border:1px solid '+SUB_COLORS[ch.sub]+'30;">'+ch.sub+'</span><span style="font-size:13px;flex:1;">'+esc(ch.name)+'</span>'+(editMode?'<button class="ch-del" onclick="delChapter('+i+')">✕</button>':'')+'</div>').join('')+'</div></div>';
+  }
+  html+='</div>';panel.innerHTML=html;
+}
+
+function buildExam(dd){
+  const photos=dd.photos||[];
+  let html='<div class="exam-area"><div class="exam-hd"><span class="exam-title">📝 Question Paper</span>'+(editMode?'<button class="upload-btn" onclick="triggerUpload()">📷 Upload</button>':'')+'</div>';
+  if(photos.length)html+='<div class="photo-grid">'+photos.map((src,i)=>'<div class="photo-thumb" onclick="openLb('+i+')"><img src="'+src+'" alt="Page '+(i+1)+'"><div class="photo-pg">Page '+(i+1)+'</div>'+(editMode?'<button class="photo-del" onclick="event.stopPropagation();delPhoto('+i+')">✕</button>':'')+' </div>').join('')+'</div><div style="font-size:12px;color:var(--amber);opacity:.7;margin-bottom:10px;">Tap any page to zoom</div>';
+  else if(editMode)html+='<div class="upload-zone" onclick="triggerUpload()"><div style="font-size:30px">📄</div><div class="upload-zone-t">Upload question paper</div><div class="upload-zone-s">Select multiple pages at once</div></div>';
+  else html+='<div style="text-align:center;padding:18px 0;color:var(--muted);font-size:13px;">No paper uploaded yet</div>';
+  const en=dd.examNote||'';
+  html+='<div style="margin-top:10px;"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;"><span>Notes</span>'+(editMode?'<button class="sub-lbl-edit" style="color:var(--amber);border-color:rgba(255,159,10,.3);" onclick="openExamNote()">✎ Edit</button>':'')+'</div>'+(en?'<div class="note-text">'+esc(en)+'</div>':'<div style="font-size:12px;color:var(--amber);opacity:.5;">'+(editMode?'Add syllabus, marks...':'Nothing added')+'</div>')+'</div></div>';
+  return html;
+}
+
+// ══ SYLLABUS ══
+function sylBack(){activeSylSub?((activeSylSub=null),renderSyllabus()):goHome();}
+function renderSyllabus(){
+  const content=document.getElementById('sylContent');
+  const prog=data['progress']||{};
+  document.getElementById('sylHint').textContent=editMode?'✎ editing':'🔒 view only';
+  if(activeSylSub){
+    document.getElementById('sylTitle').textContent=activeSylSub;
+    const color=SUB_COLORS[activeSylSub],chs=CHAPTERS[activeSylSub];
+    const done=chs.filter((_,i)=>(prog[activeSylSub]||{})[i]).length;
+    const pct=Math.round(done/chs.length*100);
+    let html='<div class="ch-list-wrap"><div class="ch-list-head"><div class="ch-prog-lbl">'+done+' of '+chs.length+' chapters · '+pct+'%</div><div class="ch-prog-bar"><div class="ch-prog-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';
+    if(activeSylSub==='Chemistry'){
+      let globalIdx=0;
+      CHEM_SECTIONS.forEach(sec=>{
+        html+='<div class="chem-section-hdr"><div class="chem-section-dot" style="background:'+sec.color+'"></div>'+sec.label+'</div>';
+        sec.chapters.forEach((ch)=>{
+          const i=globalIdx;
+          const isDone=(prog['Chemistry']||{})[i]||false;
+          html+='<div class="ch-row" style="animation-delay:'+(i*.025)+'s"><div class="ch-check'+(isDone?' done':'')+(editMode?'':' locked')+'" onclick="toggleProg(\'Chemistry\','+i+')"><span class="ch-tick">✓</span></div><span class="ch-row-name'+(isDone?' done':'')+'">'+ch+'</span></div>';
+          globalIdx++;
+        });
+      });
+    } else {
+      chs.forEach((ch,i)=>{
+        const isDone=(prog[activeSylSub]||{})[i]||false;
+        html+='<div class="ch-row" style="animation-delay:'+(i*.025)+'s"><div class="ch-check'+(isDone?' done':'')+(editMode?'':' locked')+'" onclick="toggleProg(\''+activeSylSub+'\','+i+')"><span class="ch-tick">✓</span></div><span class="ch-row-name'+(isDone?' done':'')+'">'+ch+'</span></div>';
+      });
+    }
+    html+='</div>';
+    content.innerHTML=html;
+  } else {
+    document.getElementById('sylTitle').textContent='Syllabus';
+    let html='<div class="sub-cards">';
+    SUBS.forEach((sub,idx)=>{
+      const color=SUB_COLORS[sub],chs=CHAPTERS[sub];
+      const done=chs.filter((_,i)=>(prog[sub]||{})[i]).length;
+      const pct=Math.round(done/chs.length*100);
+      html+='<div class="sub-card" style="animation-delay:'+(idx*.06)+'s" onclick="openSylSub(\''+sub+'\')"><div class="sub-icon" style="background:'+color+'18;border:1px solid '+color+'25;">'+SUB_EMOJI[sub]+'</div><div class="sub-info"><div class="sub-name">'+sub+'</div><div class="sub-meta">'+chs.length+' chapters · '+done+' done</div><div class="sub-bar"><div class="sub-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div><div class="card-arrow" style="color:'+color+'55;">›</div></div>';
+    });
+    html+='</div>';
+    content.innerHTML=html;
+  }
+}
+function openSylSub(sub){activeSylSub=sub;renderSyllabus();}
+function toggleProg(sub,i){
+  if(!editMode){showModal('<div class="modal-handle"></div><h3>🔒 Locked</h3><p style="font-size:14px;color:var(--sub);margin-bottom:16px;">Unlock edit mode from the home screen first.</p><div class="mbtns"><button class="bcnl" onclick="cModal()">Cancel</button><button class="bsave" onclick="cModal();goHome();openEdit()">Unlock</button></div>');return;}
+  if(!data['progress'])data['progress']={};
+  if(!data['progress'][sub])data['progress'][sub]={};
+  data['progress'][sub][i]=!data['progress'][sub][i];
+  saveD('progress',data['progress']);
+  renderSyllabus();updateOverall();
+}
+
+// ══ CHAPTERS STUDIED ══
+function renderStudied(){
+  document.getElementById('studiedMon').textContent=MONTHS[studiedM]+' '+studiedY;
+  const list=document.getElementById('studiedList');
+  const entries=[];
+  const total=new Date(studiedY,studiedM+1,0).getDate();
+  for(let d=1;d<=total;d++){
+    const dk=fmt(studiedY,studiedM,d),dd=data[dk]||{};
+    if(dd.chapters&&dd.chapters.length)entries.push({dk,dow:new Date(dk+'T00:00:00').getDay(),date:d,chs:dd.chapters});
+  }
+  if(!entries.length){list.innerHTML='<div class="no-studied">No chapters recorded this month</div>';return;}
+  // Flatten all chapters across all entries, deduplicate, group by subject
+  const allChs=[];
+  [...entries].reverse().forEach(e=>{e.chs.forEach(ch=>{if(!allChs.find(c=>c.sub===ch.sub&&c.name===ch.name))allChs.push(ch);});});
+  const bySub={};
+  allChs.forEach(ch=>{if(!bySub[ch.sub])bySub[ch.sub]=[];bySub[ch.sub].push(ch.name);});
+  let html2='<div class="studied-entries">';
+  Object.keys(bySub).forEach((sub,idx)=>{
+    const chips=bySub[sub].map(name=>'<span class="studied-chip" style="background:'+SUB_COLORS[sub]+'18;color:'+SUB_COLORS[sub]+';border:1px solid '+SUB_COLORS[sub]+'30;">'+name+'</span>').join('');
+    html2+='<div class="studied-entry" style="animation-delay:'+(idx*.05)+'s"><div class="studied-date" style="color:'+SUB_COLORS[sub]+';font-size:13px;font-weight:700;">'+SUB_EMOJI[sub]+' '+sub+'</div><div class="studied-chips">'+chips+'</div></div>';
+  });
+  html2+='</div>';
+  list.innerHTML=html2;
+}
+function changeStudiedM(d){
+  studiedM+=d;
+  if(studiedM>11){studiedM=0;studiedY++;}
+  if(studiedM<0){studiedM=11;studiedY--;}
+  renderStudied();
+}
+
+// ══ BOARD PDFs ══
+let storage=null;
+function initStorage(){
+  try{storage=firebase.storage();}catch(e){storage=null;}
+}
+
+function renderBoard(){
+  const container=document.getElementById('pdfCards');
+  // Load stored PDF URLs from Firebase DB
+  const pdfData=data['pdfs']||{};
+  container.innerHTML=PDFS.map((p,idx)=>{
+    const key=p.sub.replace(/\s+/g,'_');
+    const stored=pdfData[key];
+    let actionBtn='';
+    if(editMode){
+      actionBtn=`<button class="pdf-dl" style="background:rgba(110,106,240,.15);border-color:var(--accent);color:var(--accent);" onclick="uploadPDF('${key}','${p.sub}')">⬆ Upload</button>`;
+    } else if(stored){
+      actionBtn=`<button class="pdf-dl" onclick="downloadPDF('${stored.url}','11 ${p.sub}')">⬇ Save</button>`;
+    } else {
+      actionBtn=`<span style="font-size:11px;color:var(--muted);">Not uploaded yet</span>`;
+    }
+    return `<div class="pdf-card" style="animation-delay:${idx*.07}s">
+      <div class="pdf-icon" style="background:${p.color}18;border:1px solid ${p.color}25;">${p.emoji}</div>
+      <div class="pdf-info">
+        <div class="pdf-name">11 ${p.sub}</div>
+        <div class="pdf-desc">${stored?'✅ Available · Tap Save to download':p.desc}</div>
+      </div>
+      ${actionBtn}
+    </div>`;
+  }).join('');
+}
+
+// Upload PDF to Firebase Storage
+function uploadPDF(key,subName){
+  if(!editMode)return;
+  const input=document.createElement('input');
+  input.type='file';input.accept='application/pdf';
+  input.onchange=async(e)=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    if(!storage){showModal('<div class="modal-handle"></div><h3>❌ Storage not ready</h3><p style="font-size:13px;color:var(--sub);margin-bottom:14px;">Firebase Storage needs to be enabled. Go to Firebase Console → Storage → Get Started.</p><div class="mbtns"><button class="bsave" onclick="cModal()">OK</button></div>');return;}
+    // Show uploading state
+    showModal('<div class="modal-handle"></div><h3>📤 Uploading...</h3><p style="font-size:13px;color:var(--sub);">Uploading 11 '+subName+' syllabus PDF. Please wait...</p><div id="upProg" style="height:4px;background:var(--border);border-radius:2px;margin-top:16px;overflow:hidden;"><div id="upFill" style="height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .3s;"></div></div>');
+    const ref=storage.ref('pdfs/11_'+key+'.pdf');
+    const task=ref.put(file);
+    task.on('state_changed',
+      snap=>{
+        const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);
+        const fill=document.getElementById('upFill');
+        if(fill)fill.style.width=pct+'%';
+      },
+      err=>{cModal();showModal('<div class="modal-handle"></div><h3>❌ Upload failed</h3><p style="font-size:13px;color:var(--sub);margin-bottom:14px;">'+err.message+'</p><div class="mbtns"><button class="bsave" onclick="cModal()">OK</button></div>');},
+      async()=>{
+        const url=await ref.getDownloadURL();
+        if(!data['pdfs'])data['pdfs']={};
+        data['pdfs'][key]={url,name:'11 '+subName+'.pdf'};
+        saveD('pdfs/'+key,{url,name:'11 '+subName+'.pdf'});
+        cModal();
+        showModal('<div class="modal-handle"></div><h3>✅ Uploaded!</h3><p style="font-size:13px;color:var(--sub);margin-bottom:14px;">11 '+subName+' is now available for everyone to download.</p><div class="mbtns"><button class="bsave" onclick="cModal()">Done</button></div>');
+        renderBoard();
+      }
+    );
+  };
+  input.click();
+}
+
+function downloadPDF(url,displayName){
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=displayName+'.pdf';
+  a.target='_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ══ ACTIONS ══
+function toggleDd(e){e.stopPropagation();ddOpen=!ddOpen;renderDay();}
+document.addEventListener('click',()=>{if(ddOpen){ddOpen=false;renderDay();}});
+function setType(t){if(!editMode||!selDate)return;ddOpen=false;if(!data[selDate])data[selDate]={};data[selDate].type=(data[selDate].type===t)?'class':t;saveD(selDate+'/type',data[selDate].type);renderCal();renderDay();}
+function openNote(sub){if(!editMode||!selDate)return;ddOpen=false;const ex=((data[selDate]||{}).notes||{})[sub]||'';showModal('<div class="modal-handle"></div><h3><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+SUB_COLORS[sub]+';margin-right:8px;vertical-align:-1px;"></span>'+sub+' Notes</h3><label>What was taught today?</label><textarea id="ntxt" placeholder="Topics, page numbers, homework...">'+esc(ex)+'</textarea><div class="mbtns"><button class="bcnl" onclick="cModal()">Cancel</button><button class="bsave" onclick="saveNote(\''+sub+'\')">Save</button></div>');}
+function saveNote(sub){const t=document.getElementById('ntxt').value.trim();if(!data[selDate])data[selDate]={};if(!data[selDate].notes)data[selDate].notes={};if(t)data[selDate].notes[sub]=t;else delete data[selDate].notes[sub];saveD(selDate+'/notes',data[selDate].notes);cModal();renderDay();renderCal();}
+function openAddChapter(){if(!editMode||!selDate)return;ddOpen=false;showModal('<div class="modal-handle"></div><h3>📖 Chapter Started Today</h3><label>Subject</label><select id="csub" onchange="updateChOpts()"><option value="">— pick subject —</option>'+SUBS.map(s=>'<option value="'+s+'">'+s+'</option>').join('')+'</select><label>Chapter</label><select id="cch"><option value="">— pick subject first —</option></select><div class="mbtns"><button class="bcnl" onclick="cModal()">Cancel</button><button class="bsave" onclick="saveChapter()">Add</button></div>');}
+function updateChOpts(){const sub=document.getElementById('csub').value;const cc=document.getElementById('cch');if(!sub){cc.innerHTML='<option value="">— pick subject first —</option>';return;}cc.innerHTML=CHAPTERS[sub].map((ch,i)=>'<option value="'+i+'">'+ch+'</option>').join('');}
+function saveChapter(){const sub=document.getElementById('csub').value,idx=document.getElementById('cch').value;if(!sub||idx==='')return;if(!data[selDate])data[selDate]={};if(!data[selDate].chapters)data[selDate].chapters=[];const name=CHAPTERS[sub][parseInt(idx)];if(!data[selDate].chapters.find(c=>c.sub===sub&&c.name===name))data[selDate].chapters.push({sub,name});saveD(selDate+'/chapters',data[selDate].chapters);cModal();renderDay();renderCal();}
+function delChapter(i){if(!editMode||!selDate)return;data[selDate].chapters.splice(i,1);saveD(selDate+'/chapters',data[selDate].chapters);renderDay();renderCal();}
+function triggerUpload(){if(!editMode||!selDate)return;document.getElementById('fileIn').click();}
+function handleFiles(e){const files=Array.from(e.target.files);if(!files.length||!selDate)return;if(!data[selDate])data[selDate]={};if(!data[selDate].photos)data[selDate].photos=[];let done=0;files.forEach(f=>{const r=new FileReader();r.onload=ev=>{data[selDate].photos.push(ev.target.result);saveD(selDate+'/photos',data[selDate].photos);done++;if(done===files.length)renderDay();};r.readAsDataURL(f);});e.target.value='';}
+function delPhoto(i){if(!editMode||!selDate)return;data[selDate].photos.splice(i,1);saveD(selDate+'/photos',data[selDate].photos);renderDay();}
+function openLb(i){const p=(data[selDate]||{}).photos||[];lbIdx=i;document.getElementById('lbEl').innerHTML='<div class="lightbox"><button class="lb-close" onclick="closeLb()">✕</button><img class="lb-img" id="lbImg" src="'+p[lbIdx]+'" alt="Paper"><div class="lb-lbl" id="lblbl">Page '+(lbIdx+1)+' of '+p.length+'</div><div class="lb-nav"><button class="lb-btn" onclick="moveLb(-1)">‹ Prev</button><button class="lb-btn" onclick="moveLb(1)">Next ›</button></div></div>';}
+function moveLb(d){const p=(data[selDate]||{}).photos||[];lbIdx=(lbIdx+d+p.length)%p.length;document.getElementById('lbImg').src=p[lbIdx];document.getElementById('lblbl').textContent='Page '+(lbIdx+1)+' of '+p.length;}
+function closeLb(){document.getElementById('lbEl').innerHTML='';}
+function openExamNote(){if(!editMode||!selDate)return;const ex=(data[selDate]||{}).examNote||'';showModal('<div class="modal-handle"></div><h3>Exam Notes</h3><textarea id="entxt" placeholder="Chapters tested, total marks, duration...">'+esc(ex)+'</textarea><div class="mbtns"><button class="bcnl" onclick="cModal()">Cancel</button><button class="bwarn" onclick="saveExamNote()">Save</button></div>');}
+function saveExamNote(){const t=document.getElementById('entxt').value.trim();if(!data[selDate])data[selDate]={};data[selDate].examNote=t;saveD(selDate+'/examNote',t||null);cModal();renderDay();}
+
+// ══ MODAL ══
+function showModal(inner){document.getElementById('mRoot').innerHTML='<div class="modal-bg" onclick="cModal(event)"><div class="modal" onclick="event.stopPropagation()">'+inner+'</div></div>';}
+function cModal(e){if(!e||e.target.classList.contains('modal-bg'))document.getElementById('mRoot').innerHTML='';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')cModal();if(e.key==='Enter'&&e.target.id==='pwin')chkPw();});
+
+// ══ AUTH ══
+async function sha256(str){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+function openEdit(){
+  if(editMode){editMode=false;clearTimeout(editTimer);updateEditUI();renderDay();renderSyllabus();return;}
+  const now=Date.now();
+  if(lockedUntil>now){const s=Math.ceil((lockedUntil-now)/1000);showModal('<div class="modal-handle"></div><h3>🔒 Locked out</h3><p style="font-size:14px;color:var(--red);text-align:center;padding:10px 0;">Too many wrong attempts.<br>Try again in '+s+' seconds.</p><div class="mbtns"><button class="bsave" onclick="cModal()">OK</button></div>');return;}
+  showModal('<div class="modal-handle"></div><h3>🔒 Enter Password</h3><p style="font-size:13px;color:var(--sub);margin-bottom:14px;">Enter your roll number.</p><div id="perr" class="perr"></div><label>Roll Number</label><input type="password" id="pwin" placeholder="e.g. 222" autocomplete="current-password"><div class="mbtns"><button class="bcnl" onclick="cModal()">Cancel</button><button class="bsave" onclick="chkPw()">Unlock</button></div>');
+  setTimeout(()=>{const el=document.getElementById('pwin');if(el)el.focus();},120);
+}
+async function chkPw(){
+  const val=document.getElementById('pwin').value,hash=await sha256(val);
+  if(PWS.includes(hash)){
+    failCount=0;sessionStorage.setItem('ct_f','0');sessionStorage.removeItem('ct_l');
+    editMode=true;updateEditUI();cModal();renderDay();renderSyllabus();
+    resetEditTimer();
+  }else{
+    failCount++;sessionStorage.setItem('ct_f',failCount);
+    if(failCount>=3){lockedUntil=Date.now()+5*60*1000;sessionStorage.setItem('ct_l',lockedUntil);document.getElementById('perr').textContent='Locked 5 min — 3 wrong attempts.';}
+    else document.getElementById('perr').textContent='Wrong — '+(3-failCount)+' attempt(s) left.';
+  }
+}
+function resetEditTimer(){clearTimeout(editTimer);editTimer=setTimeout(()=>{editMode=false;updateEditUI();renderDay();renderSyllabus();},30*60*1000);}
+function updateEditUI(){
+  const btn=document.getElementById('editToggle'),lbl=document.getElementById('editLbl');
+  if(editMode){btn.classList.add('on');btn.querySelector('.lock-icon').textContent='🔓';lbl.textContent='Edit mode — unlocked · Tap to lock';}
+  else{btn.classList.remove('on');btn.querySelector('.lock-icon').textContent='🔒';lbl.textContent='Edit mode — locked';}
+  const h=document.getElementById('sylHint');if(h)h.textContent=editMode?'✎ editing':'🔒 view only';
+  const ch=document.getElementById('calEditHint');if(ch)ch.textContent=editMode?'✎ editing':'';
+}
+
+// ══ START ══
+initFB();
+initStorage();
+</script>
+</body>
+</html>
